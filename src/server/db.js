@@ -73,7 +73,6 @@ function createUser({ googleId, email, displayName, accessToken, refreshToken })
 }
 
 function updateUserTokens(userId, accessToken, refreshToken) {
-  const params = [accessToken, userId];
   if (refreshToken) {
     getDb().prepare('UPDATE users SET access_token = ?, refresh_token = ? WHERE id = ?')
       .run(accessToken, refreshToken, userId);

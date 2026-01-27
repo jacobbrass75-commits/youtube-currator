@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const helmet = require('helmet');
+const cors = require('cors');
 const path = require('path');
 const db = require('./db');
 const authRoutes = require('./routes/auth');
@@ -10,6 +11,14 @@ const apiRoutes = require('./routes/api');
 const app = express();
 const PORT = process.env.PORT || 3001;
 const BASE_PATH = process.env.BASE_PATH || '/yt-curator';
+
+// CORS for development (React dev server on port 3000)
+if (process.env.NODE_ENV !== 'production') {
+  app.use(cors({
+    origin: 'http://localhost:3000',
+    credentials: true,
+  }));
+}
 
 // Security headers (relaxed for YouTube embeds)
 app.use(helmet({

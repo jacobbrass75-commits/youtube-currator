@@ -21,8 +21,7 @@
     "express-session": "^1.19.0",
     "googleapis": "^170.1.0",
     "helmet": "^8.1.0",
-    "openai": "^6.16.0",
-    "uuid": "^13.0.0"
+    "openai": "^6.16.0"
   },
   "devDependencies": {
     "concurrently": "^9.2.1"
