@@ -1,0 +1,30 @@
+{
+  "name": "youtube-curator",
+  "version": "1.0.0",
+  "description": "AI-curated YouTube video recommendations PWA",
+  "main": "src/server/index.js",
+  "scripts": {
+    "dev": "concurrently \"node src/server/index.js\" \"cd src/client && npx react-scripts start\"",
+    "server": "node src/server/index.js",
+    "client:build": "cd src/client && npx react-scripts build",
+    "build": "npm run client:build",
+    "start": "node src/server/index.js"
+  },
+  "keywords": [],
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "better-sqlite3": "^12.6.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.2.3",
+    "express": "^5.2.1",
+    "express-session": "^1.19.0",
+    "googleapis": "^170.1.0",
+    "helmet": "^8.1.0",
+    "openai": "^6.16.0",
+    "uuid": "^13.0.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
