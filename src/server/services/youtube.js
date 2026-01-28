@@ -62,16 +62,22 @@ async function getSubscriptionVideos(user) {
     }
   }
 
-  // Step 3: Get recent videos from each channel's uploads playlist
+  // Step 3: Get recent videos from each channel's uploads playlist (parallel, batches of 10)
   const videos = [];
-  for (const playlistId of uploadPlaylists) {
-    try {
-      const resp = await youtube.playlistItems.list({
-        part: 'snippet',
-        playlistId,
-        maxResults: 10,
-      });
-      for (const item of resp.data.items) {
+  for (let i = 0; i < uploadPlaylists.length; i += 10) {
+    const batch = uploadPlaylists.slice(i, i + 10);
+    const results = await Promise.allSettled(
+      batch.map(playlistId =>
+        youtube.playlistItems.list({
+          part: 'snippet',
+          playlistId,
+          maxResults: 10,
+        })
+      )
+    );
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      for (const item of result.value.data.items) {
         const publishedAt = new Date(item.snippet.publishedAt);
         if (publishedAt >= since) {
           videos.push({
@@ -83,9 +89,6 @@ async function getSubscriptionVideos(user) {
           });
         }
       }
-    } catch (err) {
-      // Some playlists may be private/unavailable, skip
-      console.warn(`Skipping playlist ${playlistId}: ${err.message}`);
     }
   }
 
@@ -143,15 +146,21 @@ async function getCandidateVideos(user) {
     }
   }
 
-  // Get recent videos
-  for (const playlistId of uploadPlaylists) {
-    try {
-      const resp = await youtube.playlistItems.list({
-        part: 'snippet',
-        playlistId,
-        maxResults: 5,
-      });
-      for (const item of resp.data.items) {
+  // Get recent videos (parallel, batches of 10)
+  for (let i = 0; i < uploadPlaylists.length; i += 10) {
+    const batch = uploadPlaylists.slice(i, i + 10);
+    const results = await Promise.allSettled(
+      batch.map(playlistId =>
+        youtube.playlistItems.list({
+          part: 'snippet',
+          playlistId,
+          maxResults: 5,
+        })
+      )
+    );
+    for (const result of results) {
+      if (result.status !== 'fulfilled') continue;
+      for (const item of result.value.data.items) {
         const publishedAt = new Date(item.snippet.publishedAt);
         if (publishedAt >= since) {
           candidates.push({
@@ -164,8 +173,6 @@ async function getCandidateVideos(user) {
           });
         }
       }
-    } catch (err) {
-      // skip
     }
   }
 
@@ -277,6 +284,7 @@ async function filterOutShorts(youtube, videos) {
  * Parse ISO 8601 duration (PT1H2M3S) to seconds.
  */
 function parseDuration(iso) {
+  if (!iso) return 0;
   const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
   if (!match) return 0;
   const hours = parseInt(match[1] || '0', 10);

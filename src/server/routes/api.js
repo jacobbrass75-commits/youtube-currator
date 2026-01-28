@@ -9,14 +9,33 @@ const router = express.Router();
 // All API routes require authentication
 router.use(requireAuth);
 
+// Detect YouTube API scope/auth errors and return a clear re-auth message
+function isAuthError(err) {
+  const msg = err.message || '';
+  return msg.includes('insufficient authentication scopes') ||
+    msg.includes('Invalid Credentials') ||
+    msg.includes('invalid_grant') ||
+    (err.code === 401) || (err.code === 403 && msg.includes('forbidden'));
+}
+
+function handleApiError(res, err, context) {
+  console.error(`${context} error:`, err.message);
+  if (isAuthError(err)) {
+    return res.status(403).json({
+      error: 'YouTube access expired. Please sign out and sign back in.',
+      reauth: true,
+    });
+  }
+  res.status(500).json({ error: `Failed to ${context.toLowerCase()}` });
+}
+
 // GET /api/subscriptions — Videos from subscriptions, past 7 days, no Shorts
 router.get('/subscriptions', async (req, res) => {
   try {
     const videos = await youtube.getSubscriptionVideos(req.user);
     res.json({ videos });
   } catch (err) {
-    console.error('Subscriptions error:', err.message);
-    res.status(500).json({ error: 'Failed to fetch subscription videos' });
+    handleApiError(res, err, 'Subscriptions');
   }
 });
 
@@ -39,8 +58,7 @@ router.get('/recommended', async (req, res) => {
 
     res.json({ videos: details });
   } catch (err) {
-    console.error('Recommended error:', err.message);
-    res.status(500).json({ error: 'Failed to fetch recommendations' });
+    handleApiError(res, err, 'Recommendations');
   }
 });
 
@@ -76,8 +94,7 @@ router.post('/recommended/refresh', async (req, res) => {
       refreshesRemaining: Math.max(0, max - refreshesUsed),
     });
   } catch (err) {
-    console.error('Refresh error:', err.message);
-    res.status(500).json({ error: 'Failed to refresh recommendations' });
+    handleApiError(res, err, 'Refresh');
   }
 });
 
@@ -114,8 +131,7 @@ router.post('/video/:id/reject', async (req, res) => {
       updatedCriteria,
     });
   } catch (err) {
-    console.error('Reject error:', err.message);
-    res.status(500).json({ error: 'Failed to reject video' });
+    handleApiError(res, err, 'Reject');
   }
 });
 
