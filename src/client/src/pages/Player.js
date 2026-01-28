@@ -44,10 +44,9 @@ function Player() {
 
       <div className="player-embed">
         <iframe
-          src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&origin=${window.location.origin}`}
+          src={`https://www.youtube-nocookie.com/embed/${videoId}?autoplay=1&rel=0`}
           title="YouTube video player"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-          referrerPolicy="strict-origin-when-cross-origin"
           allowFullScreen
         />
       </div>

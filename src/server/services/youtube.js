@@ -22,18 +22,20 @@ function getAuthClient(user) {
 
 /**
  * Fetch subscription videos from the past N days (no Shorts).
+ * Returns at most 50 videos, sorted by date descending.
  */
 async function getSubscriptionVideos(user) {
+  const MAX_VIDEOS = 50;
   const auth = getAuthClient(user);
   const youtube = google.youtube({ version: 'v3', auth });
   const days = parseInt(process.env.SUBSCRIPTION_DAYS || '7', 10);
   const since = new Date();
   since.setDate(since.getDate() - days);
 
-  // Step 1: Get user's subscriptions
+  // Step 1: Get user's subscriptions (max 2 pages = 100 channels)
   let subscriptions = [];
   let pageToken = undefined;
-  for (let i = 0; i < 5; i++) { // max 5 pages = 250 channels
+  for (let i = 0; i < 2; i++) {
     const resp = await youtube.subscriptions.list({
       part: 'snippet',
       mine: true,
@@ -62,7 +64,7 @@ async function getSubscriptionVideos(user) {
     }
   }
 
-  // Step 3: Get recent videos from each channel's uploads playlist (parallel, batches of 10)
+  // Step 3: Get recent videos (parallel batches of 10, stop early when we have enough)
   const videos = [];
   for (let i = 0; i < uploadPlaylists.length; i += 10) {
     const batch = uploadPlaylists.slice(i, i + 10);
@@ -71,7 +73,7 @@ async function getSubscriptionVideos(user) {
         youtube.playlistItems.list({
           part: 'snippet',
           playlistId,
-          maxResults: 10,
+          maxResults: 5,
         })
       )
     );
@@ -90,15 +92,17 @@ async function getSubscriptionVideos(user) {
         }
       }
     }
+    // Stop fetching once we have plenty of candidates (need buffer for Shorts filtering)
+    if (videos.length >= MAX_VIDEOS * 2) break;
   }
 
   // Step 4: Filter out Shorts by checking video durations
   const filtered = await filterOutShorts(youtube, videos);
 
-  // Sort by date descending
+  // Sort by date descending and cap at MAX_VIDEOS
   filtered.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
 
-  return filtered;
+  return filtered.slice(0, MAX_VIDEOS);
 }
 
 /**
