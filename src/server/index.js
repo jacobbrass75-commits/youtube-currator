@@ -20,7 +20,7 @@ if (process.env.NODE_ENV !== 'production') {
   }));
 }
 
-// Security headers (relaxed for YouTube embeds)
+// Security headers (relaxed for YouTube embeds and HTTP operation)
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -31,9 +31,11 @@ app.use(helmet({
       frameSrc: ["https://www.youtube.com", "https://www.youtube-nocookie.com"],
       imgSrc: ["'self'", "https://i.ytimg.com", "https://yt3.ggpht.com", "https://lh3.googleusercontent.com", "data:"],
       connectSrc: ["'self'"],
+      upgradeInsecureRequests: null, // disable — server runs on HTTP
     }
   },
   crossOriginEmbedderPolicy: false,
+  hsts: false, // disable — server runs on HTTP, not behind HTTPS proxy
 }));
 
 app.use(express.json());
