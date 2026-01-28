@@ -1,7 +1,7 @@
 # YouTube Curator - Internal Codebase Documentation
 
 > AI-powered Progressive Web App for curated YouTube video recommendations.
-> Last updated after commit `e1ad325`.
+> Last updated after commit `b467c4d`.
 
 ---
 
@@ -25,6 +25,7 @@
 YouTube Curator combines the YouTube Data API v3 with OpenAI's GPT-4o-mini to deliver personalized video recommendations. Users sign in with Google, and the app pulls videos from their subscriptions and trending content. An AI model selects the 10 best matches based on user-defined curation criteria. Users can reject videos with feedback, which triggers AI-driven preference updates.
 
 **Key constraints:**
+- Max 50 subscription videos returned (most recent across all channels)
 - Max 5 users (configurable)
 - Max 5 daily refreshes per user (configurable)
 - Videos under 60 seconds (Shorts) are automatically filtered out
@@ -71,9 +72,9 @@ youtube-curator/
     │   │   └── auth.js             # requireAuth middleware (16 lines)
     │   ├── routes/
     │   │   ├── auth.js             # OAuth routes (105 lines)
-    │   │   └── api.js              # API routes (159 lines)
+    │   │   └── api.js              # API routes + error handling (175 lines)
     │   └── services/
-    │       ├── youtube.js          # YouTube API wrapper (293 lines)
+    │       ├── youtube.js          # YouTube API wrapper (301 lines)
     │       └── openai.js           # OpenAI curation (105 lines)
     └── client/
         ├── package.json            # React deps, proxy config
@@ -141,14 +142,14 @@ SQLite via `better-sqlite3` (synchronous). WAL mode and foreign keys enabled.
 
 | Function | Purpose |
 |----------|---------|
-| `getSubscriptionVideos(user)` | Fetch recent videos from subscribed channels (up to 250 channels, past N days, no Shorts) |
-| `getCandidateVideos(user)` | Wider candidate pool: subscriptions (150 channels, 5 videos each) + 50 trending videos, deduplicated, minus already-shown, minus Shorts |
+| `getSubscriptionVideos(user)` | Fetch recent videos from subscribed channels (up to 100 channels, past N days, no Shorts, max 50 results). Fetches playlists in parallel batches of 10 with early exit once enough candidates collected. |
+| `getCandidateVideos(user)` | Wider candidate pool: subscriptions (150 channels, 5 videos each) + 50 trending videos, deduplicated, minus already-shown, minus Shorts. Parallel playlist fetches in batches of 10. |
 | `getVideoDetails(user, videoIds)` | Full metadata for video IDs (batched 50/request) |
 
 Internal helpers:
 - `getAuthClient(user)` — Creates OAuth2 client with auto token refresh (listens to `tokens` event, updates DB)
 - `filterOutShorts(youtube, videos)` — Removes videos < 60 seconds via `contentDetails.duration`
-- `parseDuration(iso)` — Converts ISO 8601 duration (PT1H2M3S) to seconds
+- `parseDuration(iso)` — Converts ISO 8601 duration (PT1H2M3S) to seconds (null-safe)
 
 ### OpenAI Service — `src/server/services/openai.js`
 
@@ -296,7 +297,9 @@ CREATE INDEX idx_shown_videos_video ON shown_videos(video_id);
 | GET | `/user/stats` | Refresh counts | `{ refreshesUsed, refreshesRemaining, maxDaily }` |
 | GET | `/user/rejections` | Rejection history (100 max) | `{ rejections }` |
 
-**Error responses:** `{ error: "message" }` with appropriate HTTP status codes (400, 401, 429, 500).
+**Error responses:** `{ error: "message" }` with appropriate HTTP status codes (400, 401, 403, 429, 500).
+
+YouTube scope/auth errors return `403` with `{ error: "YouTube access expired. Please sign out and sign back in.", reauth: true }` so the frontend can prompt re-authentication.
 
 ---
 
@@ -317,7 +320,7 @@ db.incrementRefresh() --- returns false if daily limit hit (429)
 youtube.getCandidateVideos(user)
   |- Fetch subscriptions (3 pages x 50 = up to 150 channels)
   |- Get upload playlists for each channel
-  |- Fetch recent videos (5 per channel, within SUBSCRIPTION_DAYS)
+  |- Fetch recent videos (5 per channel, parallel batches of 10)
   |- Fetch 50 trending videos
   |- Deduplicate by videoId
   |- Remove already-shown videos
